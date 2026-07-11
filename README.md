@@ -6,6 +6,25 @@
 
 Uptime Kuma is an easy-to-use self-hosted monitoring tool.
 
+> [!NOTE]
+> **Это форк с поддержкой зависимостей между мониторами** (ветка [`monitor-dependencies`](https://github.com/riluse-a11y/uptime-kuma/tree/monitor-dependencies)). Все доработки — одним коммитом поверх оригинального master, есть и [готовый патч](#-отличия-этого-форка--fork-additions). `master` форка совпадает с апстримом.
+
+## 🧩 Отличия этого форка / Fork additions
+
+Новый функционал «зависимости мониторов» для построения карты инфраструктуры (роутер → гипервизор → виртуалки → сервисы):
+
+- **Тип монитора «Сервис» (service)** — группа с агрегацией статуса «худший из детей», отображается деревом зависимостей, а не плоским списком. Сервисы можно вкладывать друг в друга (подгруппы: например, гипервизор с его виртуалками внутри группы «Головной офис»).
+- **Зависимости между мониторами** (таблица `monitor_dependency`): жёсткие (hard) и мягкие (soft) связи, с защитой от циклов (общая BFS-проверка на сервере и клиенте).
+- **Статус «Недостижим» (UNREACHABLE)**: если жёсткая зависимость упала, зависимые мониторы помечаются недостижимыми, а не упавшими — уведомления шлёт только первопричина, каскад пере-проверок разгоняет обновление статуса по всей цепочке.
+- **Редактор зависимостей в форме монитора** — зависимости можно задавать прямо при создании/редактировании монитора.
+- **Интерактивный граф зависимостей** (cytoscape + dagre, слева направо) на странице сервис-монитора, с легендой и переходом по клику.
+- **Дерево на статус-странице**: отрисовка в стиле `tree` (`├─`/`└─`), сворачиваемые узлы (состояние запоминается в localStorage), рекурсия для вложенных сервисов, автообновление структуры без перезагрузки, heartbeat-бары детей выровнены с общим списком.
+- **Миграция БД включена** и применяется автоматически при первом старте — на существующей установке ничего перенастраивать не нужно.
+
+**Как применить к ванильному Uptime Kuma**: `git checkout b4ce0053 && git am 0001-*.patch && npm ci && npm run build` (патч = единственный коммит ветки `monitor-dependencies` поверх апстрима; `git format-patch b4ce0053..monitor-dependencies`). Для Docker — собрать образ штатным `docker/dockerfile` (target `release`) из пропатченного исходника.
+
+*English: this fork adds monitor dependencies — a "service" monitor type with worst-of-children aggregation rendered as a dependency tree (nestable sub-groups), hard/soft dependency edges with cycle protection, a new UNREACHABLE status with notification suppression and cascading re-checks, a dependencies editor in the monitor form, an interactive cytoscape dependency graph, and a collapsible tree view on status pages. The DB migration is included and runs automatically. All changes live in the [`monitor-dependencies`](https://github.com/riluse-a11y/uptime-kuma/tree/monitor-dependencies) branch as a single commit on top of upstream master.*
+
 <a target="_blank" href="https://github.com/louislam/uptime-kuma"><img src="https://img.shields.io/github/stars/louislam/uptime-kuma?style=flat" /></a> <a target="_blank" href="https://hub.docker.com/r/louislam/uptime-kuma"><img src="https://img.shields.io/docker/pulls/louislam/uptime-kuma" /></a> <a target="_blank" href="https://hub.docker.com/r/louislam/uptime-kuma"><img src="https://img.shields.io/docker/v/louislam/uptime-kuma/2?label=docker%20image%20ver." /></a> <a target="_blank" href="https://github.com/louislam/uptime-kuma"><img src="https://img.shields.io/github/last-commit/louislam/uptime-kuma" /></a> <a target="_blank" href="https://opencollective.com/uptime-kuma"><img src="https://opencollective.com/uptime-kuma/total/badge.svg?label=Open%20Collective%20Backers&color=brightgreen" /></a>
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/louislam?label=GitHub%20Sponsors)](https://github.com/sponsors/louislam) <a href="https://weblate.kuma.pet/projects/uptime-kuma/uptime-kuma/">
 <img src="https://weblate.kuma.pet/widgets/uptime-kuma/-/svg-badge.svg" alt="Translation status" />
