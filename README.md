@@ -6,6 +6,17 @@
 
 Uptime Kuma is an easy-to-use self-hosted monitoring tool.
 
+> [!NOTE]
+> **Custom build (this fork).** Кастомная сборка Uptime Kuma 2.4.0 с доработками:
+>
+> - Новый тип монитора **`service`** — бизнес-уровневая группировка мониторов с вложенностью (сервис → под-сервисы → проверки). Статус сервиса вычисляется из статусов дочерних мониторов.
+> - **Зависимости между мониторами** — таблица `monitor_dependency` (миграция `2026-07-04-0000-add-monitor-dependency`), редактор зависимостей в форме монитора (`MonitorDependencyEditor.vue`).
+> - **Граф зависимостей** (`DependencyGraph.vue`, `dependency-graph-utils.js`) для визуализации связей между мониторами.
+> - **Дерево сервисов на статус-странице** (`ServiceTree.vue`, `getPublicServiceTree`) — вложенное дерево с агрегированным статусом по веткам и рёбрами зависимостей.
+> - Доработки UI: HeartbeatBar, MonitorList, Tooltip, стили, локализация ru-RU/en.
+>
+> Форк ведётся независимо, PR в апстрим ([louislam/uptime-kuma](https://github.com/louislam/uptime-kuma)) не предполагаются.
+
 <a target="_blank" href="https://github.com/louislam/uptime-kuma"><img src="https://img.shields.io/github/stars/louislam/uptime-kuma?style=flat" /></a> <a target="_blank" href="https://hub.docker.com/r/louislam/uptime-kuma"><img src="https://img.shields.io/docker/pulls/louislam/uptime-kuma" /></a> <a target="_blank" href="https://hub.docker.com/r/louislam/uptime-kuma"><img src="https://img.shields.io/docker/v/louislam/uptime-kuma/2?label=docker%20image%20ver." /></a> <a target="_blank" href="https://github.com/louislam/uptime-kuma"><img src="https://img.shields.io/github/last-commit/louislam/uptime-kuma" /></a> <a target="_blank" href="https://opencollective.com/uptime-kuma"><img src="https://opencollective.com/uptime-kuma/total/badge.svg?label=Open%20Collective%20Backers&color=brightgreen" /></a>
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/louislam?label=GitHub%20Sponsors)](https://github.com/sponsors/louislam) <a href="https://weblate.kuma.pet/projects/uptime-kuma/uptime-kuma/">
 <img src="https://weblate.kuma.pet/widgets/uptime-kuma/-/svg-badge.svg" alt="Translation status" />
