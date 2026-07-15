@@ -397,10 +397,9 @@ export default {
             const isolated = this.cy.nodes().filter((n) => n.connectedEdges().length === 0);
 
             if (connected.length > 0) {
-                connected
-                    .union(this.cy.edges())
-                    .layout({ name: "dagre", rankDir: "LR", nodeSep: 35, rankSep: 70 })
-                    .run();
+                // Whole-graph dagre (the battle-tested path); isolated nodes
+                // get their dagre positions overwritten by the grid below.
+                this.cy.layout({ name: "dagre", rankDir: "LR", nodeSep: 35, rankSep: 70 }).run();
             }
 
             if (isolated.length > 0) {
