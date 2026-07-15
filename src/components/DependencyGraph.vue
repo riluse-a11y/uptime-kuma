@@ -1,10 +1,20 @@
 <template>
     <div class="dependency-graph">
         <div class="cy-wrap">
-            <div ref="cyContainer" class="cy-container"></div>
-            <button class="btn btn-outline-secondary btn-sm cy-fit-btn" type="button" :title="$t('Fit graph')" @click="fitGraph">
-                <font-awesome-icon icon="expand" />
-            </button>
+            <div ref="cyScroll" class="cy-scroll">
+                <div ref="cyContainer" class="cy-container" :style="{ height: canvasHeight + 'px' }"></div>
+            </div>
+            <div class="cy-controls">
+                <button class="btn btn-outline-secondary btn-sm" type="button" :title="$t('Zoom in')" @click="changeZoom(1.25)">
+                    <font-awesome-icon icon="plus" />
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" :title="$t('Zoom out')" @click="changeZoom(0.8)">
+                    <font-awesome-icon icon="minus" />
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" :title="$t('Fit graph')" @click="fitGraph">
+                    <font-awesome-icon icon="expand" />
+                </button>
+            </div>
         </div>
 
         <div class="graph-legend">
@@ -124,6 +134,8 @@ export default {
                 relationType: "hard",
             },
             cy: null,
+            canvasHeight: 320,
+            graphSignature: "",
         };
     },
 
@@ -299,6 +311,19 @@ export default {
 
             const elements = [ ...nodes, ...edgeEls ];
 
+            // When only statuses changed (same nodes and edges), repaint
+            // colors without resetting the layout, zoom and scroll position.
+            const signature = [
+                ...nodes.map((n) => n.data.id),
+                ...edgeEls.map((e) => `${e.data.source}>${e.data.target}:${e.classes}`),
+            ].sort().join("|");
+
+            if (this.cy && signature === this.graphSignature) {
+                this.cy.style().update();
+                return;
+            }
+            this.graphSignature = signature;
+
             if (!this.cy) {
                 this.cy = cytoscape({
                     container: this.$refs.cyContainer,
@@ -312,7 +337,7 @@ export default {
                                 "border-width": 2,
                                 "border-color": "rgba(0, 0, 0, 0.2)",
                                 color: "#fff",
-                                "font-size": 13,
+                                "font-size": 12,
                                 "font-weight": 600,
                                 "text-outline-width": 2,
                                 "text-outline-color": (el) => this.colorFor(el.data("id")),
@@ -321,9 +346,10 @@ export default {
                                 "text-wrap": "wrap",
                                 "text-max-width": "110px",
                                 width: 120,
-                                height: 40,
-                                padding: "14px",
+                                height: 36,
+                                padding: "10px",
                                 shape: "round-rectangle",
+                                "corner-radius": "18px",
                                 "transition-property": "border-width, border-color",
                                 "transition-duration": 120,
                             },
@@ -356,8 +382,10 @@ export default {
                         },
                     ],
                     layout: { name: "preset" },
-                    minZoom: 0.05,
+                    minZoom: 0.1,
                     maxZoom: 2,
+                    userZoomingEnabled: false,
+                    boxSelectionEnabled: false,
                 });
 
                 this.cy.on("mouseover", "node", (evt) => {
@@ -386,29 +414,28 @@ export default {
         },
 
         /**
-         * Lays out the graph: nodes that participate in dependency edges go
-         * through dagre (left to right, as before), while isolated nodes are
-         * packed into a grid below them. The grid's column count is derived
-         * from the container's aspect ratio so that the subsequent fit()
-         * fills the viewport instead of leaving a tall single column.
+         * Lays out the graph: dagre is run only on nodes that participate in
+         * dependency edges (running it on the whole graph would interleave
+         * the isolated nodes into the first rank and stretch the tree over
+         * thousands of pixels). Isolated nodes are packed into a grid below
+         * the tree, proportioned to the viewport.
          */
         runLayout() {
             const connected = this.cy.nodes().filter((n) => n.connectedEdges().length > 0);
-            const isolated = this.cy.nodes().filter((n) => n.connectedEdges().length === 0);
+            const isolated = this.cy.nodes().not(connected);
 
             if (connected.length > 0) {
-                // Whole-graph dagre (the battle-tested path); isolated nodes
-                // get their dagre positions overwritten by the grid below.
-                this.cy.layout({ name: "dagre", rankDir: "LR", nodeSep: 35, rankSep: 70 }).run();
+                connected
+                    .union(connected.connectedEdges())
+                    .layout({ name: "dagre", rankDir: "LR", nodeSep: 20, rankSep: 60, fit: false })
+                    .run();
             }
 
             if (isolated.length > 0) {
-                const container = this.$refs.cyContainer;
-                const aspect = container && container.clientHeight > 0
-                    ? Math.max(container.clientWidth / container.clientHeight, 1)
-                    : 3;
-                const cellW = 190;
-                const cellH = 80;
+                const cellW = 170;
+                const cellH = 70;
+                const wrap = this.$refs.cyScroll;
+                const aspect = wrap && wrap.clientWidth > 0 ? wrap.clientWidth / 520 : 2.2;
                 const cols = Math.max(1, Math.round(Math.sqrt((isolated.length * aspect * cellH) / cellW)));
 
                 let startX = 0;
@@ -427,22 +454,80 @@ export default {
                 });
             }
 
-            this.fitGraph();
+            this.applyViewport(true);
         },
 
         /**
-         * Zooms and pans so every node is visible. Zoom is capped so a
-         * near-empty graph is not blown up to comical sizes.
+         * Chooses a zoom that fills the viewport width (capped at 1:1 so a
+         * small graph is not blown up) and applies it.
+         * @param {boolean} resetScroll Scroll the wrapper back to the top
+         */
+        applyViewport(resetScroll) {
+            const wrap = this.$refs.cyScroll;
+            const bb = this.cy.elements().boundingBox();
+            if (!wrap || bb.w === 0) {
+                return;
+            }
+            const zoom = Math.min(Math.max((wrap.clientWidth - 48) / bb.w, 0.2), 1);
+            this.setViewport(zoom, resetScroll);
+        },
+
+        /**
+         * Applies a zoom level: the canvas grows to the graph's height at
+         * this zoom (the wrapper then shows a native scrollbar when the
+         * content is taller than the viewport) and the graph is aligned to
+         * the top center.
+         * @param {number} zoom Cytoscape zoom level to apply
+         * @param {boolean} resetScroll Scroll the wrapper back to the top
+         */
+        setViewport(zoom, resetScroll) {
+            const bb = this.cy.elements().boundingBox();
+            this.canvasHeight = Math.min(Math.max(Math.round(bb.h * zoom) + 48, 320), 3000);
+
+            this.$nextTick(() => {
+                this.cy.resize();
+                this.cy.zoom(zoom);
+                const w = this.$refs.cyContainer.clientWidth;
+                this.cy.pan({
+                    x: Math.max((w - bb.w * zoom) / 2, 24) - bb.x1 * zoom,
+                    y: 24 - bb.y1 * zoom,
+                });
+                if (resetScroll && this.$refs.cyScroll) {
+                    this.$refs.cyScroll.scrollTop = 0;
+                }
+            });
+        },
+
+        /**
+         * Zooms in or out around the current scroll position.
+         * @param {number} factor Multiplier for the current zoom level
+         */
+        changeZoom(factor) {
+            if (!this.cy || this.cy.nodes().length === 0) {
+                return;
+            }
+            const wrap = this.$refs.cyScroll;
+            const current = this.cy.zoom();
+            const target = Math.min(Math.max(current * factor, 0.15), 2);
+            const scrollRatio = target / current;
+            const scrollTop = wrap ? wrap.scrollTop : 0;
+
+            this.setViewport(target, false);
+            this.$nextTick(() => {
+                if (wrap) {
+                    wrap.scrollTop = scrollTop * scrollRatio;
+                }
+            });
+        },
+
+        /**
+         * Resets the view: width-fit zoom, scrolled to the top.
          */
         fitGraph() {
             if (!this.cy || this.cy.nodes().length === 0) {
                 return;
             }
-            this.cy.fit(undefined, 24);
-            if (this.cy.zoom() > 1.25) {
-                this.cy.zoom(1.25);
-                this.cy.center();
-            }
+            this.applyViewport(true);
         },
 
         colorFor(id) {
@@ -461,28 +546,44 @@ export default {
     position: relative;
 }
 
-.cy-fit-btn {
+.cy-scroll {
+    max-height: 520px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.cy-controls {
     position: absolute;
     top: 8px;
-    right: 8px;
-    opacity: 0.7;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 
-    &:hover {
-        opacity: 1;
+    .btn {
+        opacity: 0.75;
+        background: var(--bs-body-bg, #fff);
+
+        &:hover {
+            opacity: 1;
+        }
     }
 }
 
 .cy-container {
     width: 100%;
     height: 320px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
     background:
         radial-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px) 0 0 / 18px 18px;
 }
 
-.dark .cy-container {
+.dark .cy-scroll {
     border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dark .cy-container {
     background:
         radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px) 0 0 / 18px 18px;
 }
