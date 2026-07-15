@@ -7,7 +7,7 @@
 Uptime Kuma is an easy-to-use self-hosted monitoring tool.
 
 > [!NOTE]
-> **Это форк с поддержкой зависимостей между мониторами** (ветка [`monitor-dependencies`](https://github.com/riluse-a11y/uptime-kuma/tree/monitor-dependencies)). Все доработки — одним коммитом поверх оригинального master, есть и [готовый патч](#-отличия-этого-форка--fork-additions). `master` форка совпадает с апстримом.
+> **Это форк с поддержкой зависимостей между мониторами** (ветка [`monitor-dependencies`](https://github.com/riluse-a11y/uptime-kuma/tree/monitor-dependencies)). Все доработки — одним коммитом поверх оригинального master, есть и [готовый патч](#-отличия-этого-форка--fork-additions). `master` форка содержит эти доработки (актуальная кастомная сборка, задеплоенная в прод).
 
 ## 🧩 Отличия этого форка / Fork additions
 
