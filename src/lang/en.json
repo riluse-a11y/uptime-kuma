@@ -1,4 +1,5 @@
 {
+    "Fit graph": "Fit graph",
     "languageName": "English",
     "setupDatabaseChooseDatabase": "Which database would you like to use?",
     "setupDatabaseEmbeddedMariaDB": "You don't need to set anything. This Docker image has embedded and configured MariaDB for you automatically. Uptime Kuma will connect to this database via Unix socket.",

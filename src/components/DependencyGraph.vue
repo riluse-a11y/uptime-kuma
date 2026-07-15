@@ -1,6 +1,11 @@
 <template>
     <div class="dependency-graph">
-        <div ref="cyContainer" class="cy-container"></div>
+        <div class="cy-wrap">
+            <div ref="cyContainer" class="cy-container"></div>
+            <button class="btn btn-outline-secondary btn-sm cy-fit-btn" type="button" :title="$t('Fit graph')" @click="fitGraph">
+                <font-awesome-icon icon="expand" />
+            </button>
+        </div>
 
         <div class="graph-legend">
             <span v-for="item in statusLegend" :key="item.status" class="legend-item">
@@ -350,8 +355,8 @@ export default {
                             },
                         },
                     ],
-                    layout: { name: "dagre", rankDir: "LR", nodeSep: 35, rankSep: 70 },
-                    minZoom: 0.3,
+                    layout: { name: "preset" },
+                    minZoom: 0.05,
                     maxZoom: 2,
                 });
 
@@ -366,11 +371,78 @@ export default {
                 this.cy.on("tap", "node", (evt) => {
                     this.$router.push(getMonitorRelativeURL(evt.target.id()));
                 });
+                this.cy.on("dbltap", (evt) => {
+                    if (evt.target === this.cy) {
+                        this.fitGraph();
+                    }
+                });
+                this.runLayout();
             } else {
                 this.cy.elements().remove();
                 this.cy.add(elements);
                 this.cy.style().update();
-                this.cy.layout({ name: "dagre", rankDir: "LR", nodeSep: 35, rankSep: 70 }).run();
+                this.runLayout();
+            }
+        },
+
+        /**
+         * Lays out the graph: nodes that participate in dependency edges go
+         * through dagre (left to right, as before), while isolated nodes are
+         * packed into a grid below them. The grid's column count is derived
+         * from the container's aspect ratio so that the subsequent fit()
+         * fills the viewport instead of leaving a tall single column.
+         */
+        runLayout() {
+            const connected = this.cy.nodes().filter((n) => n.connectedEdges().length > 0);
+            const isolated = this.cy.nodes().filter((n) => n.connectedEdges().length === 0);
+
+            if (connected.length > 0) {
+                connected
+                    .union(this.cy.edges())
+                    .layout({ name: "dagre", rankDir: "LR", nodeSep: 35, rankSep: 70 })
+                    .run();
+            }
+
+            if (isolated.length > 0) {
+                const container = this.$refs.cyContainer;
+                const aspect = container && container.clientHeight > 0
+                    ? Math.max(container.clientWidth / container.clientHeight, 1)
+                    : 3;
+                const cellW = 190;
+                const cellH = 80;
+                const cols = Math.max(1, Math.round(Math.sqrt((isolated.length * aspect * cellH) / cellW)));
+
+                let startX = 0;
+                let startY = 0;
+                if (connected.length > 0) {
+                    const bb = connected.boundingBox();
+                    startX = bb.x1;
+                    startY = bb.y2 + cellH;
+                }
+
+                isolated.forEach((node, i) => {
+                    node.position({
+                        x: startX + (i % cols) * cellW,
+                        y: startY + Math.floor(i / cols) * cellH,
+                    });
+                });
+            }
+
+            this.fitGraph();
+        },
+
+        /**
+         * Zooms and pans so every node is visible. Zoom is capped so a
+         * near-empty graph is not blown up to comical sizes.
+         */
+        fitGraph() {
+            if (!this.cy || this.cy.nodes().length === 0) {
+                return;
+            }
+            this.cy.fit(undefined, 24);
+            if (this.cy.zoom() > 1.25) {
+                this.cy.zoom(1.25);
+                this.cy.center();
             }
         },
 
@@ -386,6 +458,21 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.cy-wrap {
+    position: relative;
+}
+
+.cy-fit-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0.7;
+
+    &:hover {
+        opacity: 1;
+    }
+}
+
 .cy-container {
     width: 100%;
     height: 320px;
