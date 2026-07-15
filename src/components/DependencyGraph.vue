@@ -320,7 +320,7 @@ export default {
                                 "text-halign": "center",
                                 "text-wrap": "wrap",
                                 "text-max-width": "110px",
-                                width: "label",
+                                width: 120,
                                 height: 40,
                                 padding: "14px",
                                 shape: "round-rectangle",
